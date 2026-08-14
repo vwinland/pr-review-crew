@@ -111,10 +111,13 @@ def post_review_comment(
     safe demos against real PR numbers.
     """
     if os.environ.get("PR_REVIEW_CREW_DRY_RUN") == "1":
-        preview = body if len(body) < 4000 else body[:4000] + "... [truncated]"
+        # Keep this short: the full body already passed through the model once
+        # to get here, so echoing it back in full would double it up in the
+        # next turn's context -- risking rate/size limits on smaller models.
+        preview = body if len(body) < 200 else body[:200] + "... [truncated]"
         return (
-            f"[DRY RUN] Would have posted a comment on {repo}#{pr_number}. "
-            f"Comment body:\n\n{preview}"
+            f"[DRY RUN] Would have posted a comment on {repo}#{pr_number} "
+            f"({len(body)} chars). Preview:\n\n{preview}"
         )
 
     token = os.environ.get("GITHUB_TOKEN")

@@ -5,3 +5,5 @@ __pycache__/
 WareHouse/
 .chatdev_runtime/
 .agents/
+logs/
+.DS_Store

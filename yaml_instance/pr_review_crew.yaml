@@ -1,7 +1,4 @@
 version: 0.4.0
-vars:
-  BASE_URL: ${BASE_URL}
-  API_KEY: ${API_KEY}
 graph:
   id: pr_review_crew
   description: >
@@ -186,7 +183,7 @@ graph:
 
             ## Automated Review Summary
 
-            **Verdict:** <one of: Looks good ✅ | Minor changes suggested 🟡 | Changes requested 🔴>
+            **Verdict:** <one of: Looks good | Minor changes suggested | Changes requested>
 
             ### Must Fix
             <bulleted list, or "None">
@@ -204,8 +201,10 @@ graph:
             *Posted automatically by PR Review Crew.*
 
           Be concise and specific. Do not invent findings the specialist reports did
-          not mention. Always include the REPO and PR lines exactly as shown above,
-          at the top of your output, since the next agent parses them.
+          not mention. Each finding belongs in exactly ONE section, whichever fits
+          best -- never repeat the same finding under multiple headings. Always
+          include the REPO and PR lines exactly as shown above, at the top of your
+          output, since the next agent parses them.
         params:
           temperature: 0.2
           max_tokens: 1500
@@ -225,13 +224,18 @@ graph:
             **REPO:** <owner/repo>
             **PR:** <number>
 
-          Extract the repo and PR number, then call `post_review_comment` with that
-          repo, PR number, and the full Markdown body (including the REPO/PR lines).
-          After calling the tool, output only the tool's result message, verbatim,
-          with no additional commentary.
+          Call `post_review_comment` with that repo, PR number, and the full
+          Markdown body (including the REPO/PR lines) EXACTLY ONCE.
+
+          CRITICAL: If the conversation already contains a result from
+          post_review_comment (a message starting with "Posted comment on" or
+          "[DRY RUN] Would have posted"), the tool has already succeeded. Do NOT
+          call it again for any reason. Immediately output that exact result
+          message, verbatim, with no additional commentary, and stop. Calling
+          the tool more than once is a critical error.
         params:
           temperature: 0.0
-          max_tokens: 500
+          max_tokens: 4000
         tooling:
           - type: function
             config:

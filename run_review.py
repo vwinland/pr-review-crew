@@ -24,6 +24,17 @@ REPO_ROOT = Path(__file__).resolve().parent
 YAML_PATH = REPO_ROOT / "yaml_instance" / "pr_review_crew.yaml"
 FUNCTIONS_DIR = REPO_ROOT / "functions" / "function_calling"
 
+try:
+    from dotenv import load_dotenv
+
+    # Loads REPO_ROOT/.env into the environment without overriding any vars
+    # already set in the shell (so `export FOO=bar && python run_review.py`
+    # still takes precedence over .env, matching the behavior documented in
+    # the README before python-dotenv was added).
+    load_dotenv(REPO_ROOT / ".env")
+except ImportError:
+    pass  # python-dotenv not installed -- fall back to manually exported env vars
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the PR Review Crew multi-agent workflow.")
