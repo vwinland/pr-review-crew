@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--provider", default=os.environ.get("PROVIDER", "openai"), help="LLM provider (openai or gemini).")
     parser.add_argument("--model", default=os.environ.get("MODEL", "gpt-4o-mini"), help="Model name for the crew's agents.")
+    parser.add_argument(
+        "--base-url",
+        default=os.environ.get("BASE_URL") or None,
+        help="Override the API base URL, e.g. http://localhost:11434/v1 for Ollama "
+        "or https://api.groq.com/openai/v1 for Groq. Defaults to BASE_URL from .env.",
+    )
     return parser.parse_args()
 
 
@@ -86,7 +92,7 @@ def main() -> int:
         "Comment Poster",
     ]
     agent_configs = {
-        node_id: AgentConfig(provider=args.provider, model=args.model)
+        node_id: AgentConfig(provider=args.provider, model=args.model, base_url=args.base_url)
         for node_id in node_ids
     }
 

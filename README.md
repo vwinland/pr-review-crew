@@ -60,6 +60,8 @@ cp .env.example .env
 export $(grep -v '^#' .env | xargs)   # or use direnv/python-dotenv
 ```
 
+**Don't want to pay for OpenAI?** `.env.example` has ready-to-uncomment recipes for [Groq](https://console.groq.com/keys) (free tier, fast, reliable tool calling — the easiest drop-in swap) and [Gemini](https://aistudio.google.com/apikey) (free tier, natively supported by `chatdev` as its own provider), plus fully-local [Ollama](https://ollama.com). All three are OpenAI-API-compatible except Gemini, which chatdev talks to directly. One caveat for local models: **Diff Fetcher** and **Comment Poster** call tools, so whichever model backs those two nodes needs real function-calling support (e.g. `llama3.1`, `qwen2.5`, `mistral-nemo` on Ollama) — the three reviewer nodes don't call tools, so they're far less picky. You can also override the endpoint per-run without touching `.env`: `python run_review.py owner/repo 123 --dry-run --provider openai --base-url http://localhost:11434/v1 --model llama3.1`.
+
 ## Demo
 
 ```bash
