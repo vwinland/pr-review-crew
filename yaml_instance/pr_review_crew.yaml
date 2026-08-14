@@ -1,0 +1,256 @@
+version: 0.4.0
+vars:
+  BASE_URL: ${BASE_URL}
+  API_KEY: ${API_KEY}
+graph:
+  id: pr_review_crew
+  description: >
+    A multi-agent PR reviewer. One agent fetches the diff, three specialist
+    agents review it in parallel (logic/style, security, docs/tests), a
+    synthesizer merges their findings into one comment, and a final agent
+    posts it back to GitHub.
+  log_level: INFO
+  is_majority_voting: false
+  initial_instruction: |
+    Provide a task in the form "owner/repo#pr_number" (e.g. "openai/openai-python#123"),
+    optionally followed by extra review instructions. The crew will fetch the PR diff,
+    run three specialist reviews in parallel, synthesize them, and post one consolidated
+    comment back to the pull request.
+  start:
+    - Diff Fetcher
+  end:
+    - Comment Poster
+  nodes:
+    - id: Diff Fetcher
+      type: agent
+      description: Parses the repo/PR from the task and pulls the diff + changed files.
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o-mini
+        role: |
+          You are the intake agent for an automated PR review crew.
+
+          1. Parse the user's task to find a GitHub repo in "owner/repo" form and a PR
+             number (formats like "owner/repo#123", "owner/repo, PR 123", or a full
+             GitHub PR URL are all valid).
+          2. Call `get_pr_files` with that repo and PR number to retrieve the changed
+             files and diff.
+          3. Output ONLY the following, verbatim, with no commentary of your own:
+
+             REPO: <owner/repo>
+             PR: <number>
+             ---
+             <the raw diff/file content returned by the tool>
+
+          Always include the REPO and PR header lines exactly in this format, even if
+          you have to re-state them from the user's task. Downstream agents depend on
+          this header to know which PR they are reviewing.
+        params:
+          temperature: 0.0
+          max_tokens: 4000
+        tooling:
+          - type: function
+            config:
+              tools:
+                - name: get_pr_files
+                - name: get_pr_diff
+              timeout: 30
+
+    - id: Logic Style Reviewer
+      type: agent
+      description: Reviews code logic, readability, and style.
+      context_window: -1
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o-mini
+        role: |
+          You are a senior engineer reviewing pull requests for logic correctness,
+          readability, and style. You will receive a message starting with:
+
+            REPO: <owner/repo>
+            PR: <number>
+            ---
+            <diff>
+
+          Review only the diff. Look for logic bugs, edge cases, naming, dead code,
+          overly complex control flow, and inconsistency with typical conventions for
+          the language you see in the diff. Ignore security and testing concerns;
+          other reviewers cover those.
+
+          Output in this exact format:
+
+            REPO: <owner/repo>
+            PR: <number>
+            SECTION: Logic & Style
+            - <finding 1, with file/line reference if visible in the diff>
+            - <finding 2>
+            (If nothing notable, output "- No significant logic or style issues found.")
+        params:
+          temperature: 0.2
+          max_tokens: 1200
+
+    - id: Security Reviewer
+      type: agent
+      description: Reviews the diff for security issues.
+      context_window: -1
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o-mini
+        role: |
+          You are an application security reviewer. You will receive a message
+          starting with:
+
+            REPO: <owner/repo>
+            PR: <number>
+            ---
+            <diff>
+
+          Review only the diff for security issues: injection risks, hard-coded
+          secrets/credentials, unsafe deserialization, missing input validation,
+          auth/authorization gaps, unsafe use of eval/exec/shell commands, and
+          dependency or supply-chain red flags. Ignore pure style/logic and testing
+          concerns; other reviewers cover those.
+
+          Output in this exact format:
+
+            REPO: <owner/repo>
+            PR: <number>
+            SECTION: Security
+            - <finding 1, with file/line reference if visible in the diff>
+            - <finding 2>
+            (If nothing notable, output "- No security issues found.")
+        params:
+          temperature: 0.2
+          max_tokens: 1200
+
+    - id: Docs Tests Reviewer
+      type: agent
+      description: Reviews the diff for missing docs/tests.
+      context_window: -1
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o-mini
+        role: |
+          You are a reviewer focused on documentation and test coverage. You will
+          receive a message starting with:
+
+            REPO: <owner/repo>
+            PR: <number>
+            ---
+            <diff>
+
+          Review only the diff for: missing or stale docstrings/comments, missing
+          README/CHANGELOG updates for user-facing changes, and missing or
+          insufficient tests for the changed behavior. Ignore logic/style and
+          security concerns; other reviewers cover those.
+
+          Output in this exact format:
+
+            REPO: <owner/repo>
+            PR: <number>
+            SECTION: Docs & Tests
+            - <finding 1, with file/line reference if visible in the diff>
+            - <finding 2>
+            (If nothing notable, output "- Docs and tests look adequate for this change.")
+        params:
+          temperature: 0.2
+          max_tokens: 1200
+
+    - id: Synthesizer
+      type: agent
+      description: Merges the three specialist reviews into one comment.
+      context_window: -1
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o
+        role: |
+          You are the lead reviewer synthesizing three specialist reports (Logic &
+          Style, Security, Docs & Tests) into one consolidated PR review comment.
+          Each report starts with a "REPO:" / "PR:" header — they should all agree;
+          use that repo/PR for your own output.
+
+          Write a single Markdown PR comment with this structure:
+
+            **REPO:** <owner/repo>
+            **PR:** <number>
+
+            ## Automated Review Summary
+
+            **Verdict:** <one of: Looks good ✅ | Minor changes suggested 🟡 | Changes requested 🔴>
+
+            ### Must Fix
+            <bulleted list, or "None">
+
+            ### Suggestions
+            <bulleted list, or "None">
+
+            ### Security Notes
+            <bulleted list, or "None">
+
+            ### Docs & Tests
+            <bulleted list, or "None">
+
+            ---
+            *Posted automatically by PR Review Crew.*
+
+          Be concise and specific. Do not invent findings the specialist reports did
+          not mention. Always include the REPO and PR lines exactly as shown above,
+          at the top of your output, since the next agent parses them.
+        params:
+          temperature: 0.2
+          max_tokens: 1500
+
+    - id: Comment Poster
+      type: agent
+      description: Posts the synthesized review back to the GitHub PR.
+      context_window: -1
+      config:
+        provider: openai
+        base_url: ${BASE_URL}
+        api_key: ${API_KEY}
+        name: gpt-4o-mini
+        role: |
+          You receive a Markdown PR review comment that starts with:
+
+            **REPO:** <owner/repo>
+            **PR:** <number>
+
+          Extract the repo and PR number, then call `post_review_comment` with that
+          repo, PR number, and the full Markdown body (including the REPO/PR lines).
+          After calling the tool, output only the tool's result message, verbatim,
+          with no additional commentary.
+        params:
+          temperature: 0.0
+          max_tokens: 500
+        tooling:
+          - type: function
+            config:
+              tools:
+                - name: post_review_comment
+              timeout: 30
+
+  edges:
+    - from: Diff Fetcher
+      to: Logic Style Reviewer
+    - from: Diff Fetcher
+      to: Security Reviewer
+    - from: Diff Fetcher
+      to: Docs Tests Reviewer
+    - from: Logic Style Reviewer
+      to: Synthesizer
+    - from: Security Reviewer
+      to: Synthesizer
+    - from: Docs Tests Reviewer
+      to: Synthesizer
+    - from: Synthesizer
+      to: Comment Poster
