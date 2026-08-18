@@ -77,6 +77,12 @@ python run_review.py your-org/your-repo 42
 
 Talking through the output is the whole pitch: point at your own repo's open PR, run with `--dry-run`, and walk through why each of the three reviewer sections says what it says.
 
+## Data & security notes
+
+- **PR content goes to your configured LLM provider.** The diff, changed-file patches, and any repo/file names in them are sent to whichever provider `.env` points at (OpenAI, Groq, Gemini) unless you're running fully local via Ollama. Fine for public repos and open-source PRs; check your organization's data/LLM policy before pointing this at private code.
+- **Reviewer and synthesizer prompts treat the diff as untrusted content, not instructions** — each one is explicitly told that text inside the diff (or quoted from it) is data to review, never commands to obey. This is a mitigation, not a guarantee: it doesn't eliminate prompt-injection risk, and nothing here should post automatically to a repo that matters without a human reading the comment first.
+- **Scope your `GITHUB_TOKEN` to the minimum this needs.** The tools only read PR diffs/files and write issue comments — they never push, merge, or touch repo settings. A fine-grained PAT limited to the specific repo(s) you're running this against, with **Pull requests: Read-only** and **Issues: Read and write**, is enough; a broad classic `repo`-scoped token works too but grants far more than the tool ever uses.
+
 ## Repo layout
 
 ```
