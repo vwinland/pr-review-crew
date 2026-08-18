@@ -89,6 +89,12 @@ graph:
         params:
           temperature: 0.2
           max_tokens: 3000
+          # reasoning_effort is specific to reasoning models (e.g. Groq's gpt-oss-*).
+          # It keeps the hidden chain-of-thought short so it doesn't exhaust max_tokens
+          # before any visible answer is written. Remove this line if you point this
+          # node at a non-reasoning model (e.g. plain OpenAI gpt-4o-mini) -- it isn't a
+          # recognized parameter there and the call will fail.
+          reasoning_effort: low
 
     - id: Security Reviewer
       type: agent
@@ -125,6 +131,8 @@ graph:
         params:
           temperature: 0.2
           max_tokens: 3000
+          # See the note on Logic Style Reviewer's reasoning_effort above.
+          reasoning_effort: low
 
     - id: Docs Tests Reviewer
       type: agent
@@ -160,6 +168,8 @@ graph:
         params:
           temperature: 0.2
           max_tokens: 3000
+          # See the note on Logic Style Reviewer's reasoning_effort above.
+          reasoning_effort: low
 
     - id: Synthesizer
       type: agent
