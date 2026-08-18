@@ -39,6 +39,8 @@ Two design choices worth calling out if you're reading the YAML:
 - **Context propagation.** ChatDev's graph only forwards each node's output to its direct downstream edges by default, so a node several hops downstream can't see the original task prompt. Every reviewer node sets `context_window: -1` to see full history, and every agent is instructed to echo the `REPO:` / `PR:` header in its own output — an explicit protocol instead of relying on implicit state, so the last node in the chain still knows which PR to comment on.
 - **Deterministic vs. agentic steps.** Fetching a diff and posting a comment are deterministic API calls, not reasoning tasks — but ChatDev's `python` node type only executes pre-existing scripts from a shared workspace, it doesn't take inline code in YAML. So those steps are thin agent nodes with a single bound tool and `temperature: 0.0`, which keeps them fast/cheap while staying inside the graph's tool-calling model.
 
+For a deeper walkthrough — the full node-by-node breakdown, a traced example request, and the engine mechanics (implicit tool-call self-loops, context propagation) that explain most of the bugs found while building this — see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
 ## Tools
 
 [`functions/function_calling/github_tools.py`](functions/function_calling/github_tools.py) defines three plain Python functions — `get_pr_diff`, `get_pr_files`, `post_review_comment` — using ChatDev's [Function Tooling](https://github.com/OpenBMB/ChatDev/blob/main/docs/user_guide/en/modules/tooling/function.md) convention: type-hinted top-level functions with `Annotated[..., ParamMeta(description=...)]`, auto-converted into JSON Schema for the model. `run_review.py` points `MAC_FUNCTIONS_DIR` at this folder so ChatDev discovers them without needing a full ChatDev checkout.
@@ -67,7 +69,7 @@ cp .env.example .env
 
 ```bash
 # Safe demo: fetches a real diff, runs the full crew, prints the comment, does NOT post it
-python run_review.py openai/openai-python 1234 --dry-run
+python run_review.py pallets/flask 6096 --dry-run
 
 # Live: actually posts the consolidated review as a PR comment (needs GITHUB_TOKEN)
 python run_review.py your-org/your-repo 42

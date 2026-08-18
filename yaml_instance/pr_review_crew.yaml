@@ -88,7 +88,7 @@ graph:
             (If nothing notable, output "- No significant logic or style issues found.")
         params:
           temperature: 0.2
-          max_tokens: 1200
+          max_tokens: 3000
 
     - id: Security Reviewer
       type: agent
@@ -124,7 +124,7 @@ graph:
             (If nothing notable, output "- No security issues found.")
         params:
           temperature: 0.2
-          max_tokens: 1200
+          max_tokens: 3000
 
     - id: Docs Tests Reviewer
       type: agent
@@ -159,7 +159,7 @@ graph:
             (If nothing notable, output "- Docs and tests look adequate for this change.")
         params:
           temperature: 0.2
-          max_tokens: 1200
+          max_tokens: 3000
 
     - id: Synthesizer
       type: agent
