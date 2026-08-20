@@ -12,7 +12,7 @@ I wanted a project that actually shows multi-agent *design* decisions, not just 
 
 ```mermaid
 flowchart LR
-    U([Task: "owner/repo#123"]) --> DF[Diff Fetcher]
+    U([Task: owner/repo#123]) --> DF[Diff Fetcher]
     DF -->|diff + REPO/PR header| LS[Logic & Style Reviewer]
     DF -->|diff + REPO/PR header| SEC[Security Reviewer]
     DF -->|diff + REPO/PR header| DT[Docs & Tests Reviewer]
